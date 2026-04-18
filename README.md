@@ -144,7 +144,27 @@ start_all        # Starts MLflow + FastAPI + Streamlit
 start_ngrok      # Creates public tunnel URL
 ```
 
-### Live Google Cloud GPU Access
+### Testing & Validation
+The project includes a robust, offline Pytest suite (`tests/test_api.py`) that strictly validates API logic, payload enforcement, and data casting without relying on heavy GPU models.
+
+```bash
+pip install pytest httpx
+PYTHONPATH=. pytest tests/ -v
+```
+**Test Coverage Includes:**
+1. Health Endpoint validation (`/health`)
+2. Missing Form/Payload logic parsing (`422 Unprocessable`)
+3. Model Parameter Guardrails (Rejecting non-registered LoRA endpoints)
+4. Input Extension Spoofing (Safely rejecting `.pdf` parsing)
+5. Pydantic Null Value handling
+6. Strict Type Casting enforcement
+7. Sub-Endpoint Payload drops (`/extract_mask`)
+8. Authentication drops cleanly bypassing 500s (`/upload`)
+
+---
+
+## Live Google Cloud GPU Access
+
 This project is currently deployed on a **Google Cloud n1-standard-4 Spot VM** with an attached **NVIDIA Tesla T4 GPU**.
 
 | Service | Access URL | Description |
