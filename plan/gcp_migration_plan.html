@@ -1,0 +1,239 @@
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+.phase-tabs{display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.tab{padding:5px 14px;border-radius:20px;font-size:12px;font-weight:500;cursor:pointer;border:0.5px solid var(--color-border-secondary);background:transparent;color:var(--color-text-secondary);transition:all .15s}
+.tab.active{background:var(--color-text-primary);color:var(--color-background-primary);border-color:var(--color-text-primary)}
+.phase{display:none;flex-direction:column;gap:10px}
+.phase.active{display:flex}
+.row{display:grid;grid-template-columns:1fr 28px 1fr;gap:0;align-items:stretch}
+.cell{padding:10px 13px;border-radius:var(--border-radius-md);font-size:12px;line-height:1.5}
+.arrow-col{display:flex;align-items:center;justify-content:center;color:var(--color-text-tertiary);font-size:16px;padding:0 4px}
+.from{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary)}
+.to{border:0.5px solid var(--color-border-secondary)}
+.effort-high .to{background:#FCEBEB;border-color:#F09595}
+.effort-med .to{background:#FAEEDA;border-color:#FAC775}
+.effort-low .to{background:#E1F5EE;border-color:#9FE1CB}
+.cell-label{font-size:10px;font-weight:500;letter-spacing:.05em;text-transform:uppercase;margin-bottom:3px}
+.from .cell-label{color:var(--color-text-tertiary)}
+.effort-high .to .cell-label{color:#791F1F}
+.effort-med .to .cell-label{color:#633806}
+.effort-low .to .cell-label{color:#085041}
+.cell-title{font-weight:500;font-size:13px;color:var(--color-text-primary)}
+.from .cell-title{color:var(--color-text-secondary)}
+.cell-desc{font-size:11px;color:var(--color-text-secondary);margin-top:2px}
+.effort-high .to .cell-desc{color:#A32D2D}
+.effort-med .to .cell-desc{color:#854F0B}
+.effort-low .to .cell-desc{color:#0F6E56}
+.section-heading{font-size:11px;font-weight:500;color:var(--color-text-tertiary);letter-spacing:.06em;text-transform:uppercase;padding:4px 0 2px}
+.legend{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.leg{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--color-text-secondary)}
+.leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0}
+.leg-red{background:#E24B4A}.leg-amber{background:#BA7517}.leg-green{background:#1D9E75}
+.tip{background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:10px 13px;font-size:12px;color:var(--color-text-secondary);line-height:1.6;margin-top:4px}
+.tip strong{font-weight:500;color:var(--color-text-primary)}
+</style>
+
+<h2 class="sr-only">GCP migration plan showing what each local component maps to in Google Cloud, organised by phase and colour-coded by effort</h2>
+
+<div class="legend">
+  <span class="leg"><span class="leg-dot leg-red"></span>High effort — new concepts or infra</span>
+  <span class="leg"><span class="leg-dot leg-amber"></span>Medium — config changes required</span>
+  <span class="leg"><span class="leg-dot leg-green"></span>Low effort — drop-in swap</span>
+</div>
+
+<div class="phase-tabs">
+  <button class="tab active" onclick="showPhase('p1',this)">1 · Foundation</button>
+  <button class="tab" onclick="showPhase('p2',this)">2 · Serving</button>
+  <button class="tab" onclick="showPhase('p3',this)">3 · MLOps</button>
+  <button class="tab" onclick="showPhase('p4',this)">4 · CI / CD</button>
+  <button class="tab" onclick="showPhase('p5',this)">5 · Hardening</button>
+</div>
+
+<!-- PHASE 1: Foundation -->
+<div class="phase active" id="p1">
+  <div class="section-heading">Compute</div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">GTX 1080 Ti · 11 GB</div><div class="cell-desc">Campus machine, manual start</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">Vertex AI Workbench or GKE GPU node</div><div class="cell-desc">n1-standard-8 + T4 (16 GB) · request GPU quota first</div></div>
+  </div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Float32 · xFormers</div><div class="cell-desc">Forced by compute 6.1 cap</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">BFloat16 + Flash Attention 2</div><div class="cell-desc">T4 / A100 support bf16 — halves VRAM, 40 % faster inference</div></div>
+  </div>
+
+  <div class="section-heading">Storage</div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">models/ on disk</div><div class="cell-desc">LoRA weights, 17 MB each</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Cloud Storage (GCS) bucket</div><div class="cell-desc">gs://genai-studio/models/ · mounted via gcsfuse or pulled on startup</div></div>
+  </div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">mlflow.db (SQLite)</div><div class="cell-desc">Single file, no HA</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Cloud SQL (PostgreSQL) + GCS artifacts</div><div class="cell-desc">MLflow backend-store-uri points to Cloud SQL; artifact-root to GCS</div></div>
+  </div>
+
+  <div class="section-heading">Container registry</div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Docker build · local image</div><div class="cell-desc">Manual build on server</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Artifact Registry</div><div class="cell-desc">us-central1-docker.pkg.dev/PROJECT/genai/backend:SHA</div></div>
+  </div>
+
+  <div class="tip"><strong>Start here.</strong> Enable APIs: <code>container.googleapis.com</code>, <code>aiplatform.googleapis.com</code>, <code>sql-component.googleapis.com</code>, <code>storage.googleapis.com</code>, <code>artifactregistry.googleapis.com</code>. Request T4 GPU quota in your region before anything else — it takes 1–2 business days.</div>
+</div>
+
+<!-- PHASE 2: Serving -->
+<div class="phase" id="p2">
+  <div class="section-heading">API serving</div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Uvicorn · port 8000</div><div class="cell-desc">Single process, no autoscaling</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">GKE Autopilot + GPU node pool</div><div class="cell-desc">Deployment + HPA on custom Prometheus metric (queue depth)</div></div>
+  </div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Streamlit · port 8501</div><div class="cell-desc">Served on same machine</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">Cloud Run (CPU-only)</div><div class="cell-desc">Streamlit is stateless UI — no GPU needed, scales to zero, cheap</div></div>
+  </div>
+
+  <div class="section-heading">Networking</div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Ngrok free tunnel</div><div class="cell-desc">Fragile, single URL, no TLS control</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">HTTPS Load Balancer + Cloud Armor</div><div class="cell-desc">Managed TLS cert, DDoS protection, static IP, custom domain</div></div>
+  </div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">FastAPI CORS wildcard</div><div class="cell-desc">*.ngrok.app allowed</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Origin-locked CORS policy</div><div class="cell-desc">Lock to your Cloud Run domain — one env var change</div></div>
+  </div>
+
+  <div class="section-heading">Model adapter loading</div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Load LoRA from /models on startup</div><div class="cell-desc">Pre-baked into container image</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">Pull from GCS at pod init via init-container</div><div class="cell-desc">Keeps image lean; swap adapters without rebuilding — true hot-reload</div></div>
+  </div>
+
+  <div class="tip"><strong>Key architecture decision.</strong> Run the FastAPI GPU backend on GKE (needs GPU), but run Streamlit on Cloud Run (CPU-only, $0 at idle). They talk via an internal load balancer URL — the UI never touches the GPU pod directly.</div>
+</div>
+
+<!-- PHASE 3: MLOps -->
+<div class="phase" id="p3">
+  <div class="section-heading">Experiment tracking</div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">MLflow · localhost:5000</div><div class="cell-desc">SQLite backend, lost on reboot</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">MLflow on Cloud Run + Cloud SQL + GCS</div><div class="cell-desc">Persistent, multi-user, shareable URL — or switch to Vertex AI Experiments</div></div>
+  </div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">train_lora.py · manual run</div><div class="cell-desc">Blocks your terminal for hours</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">Vertex AI Training Jobs</div><div class="cell-desc">Submit job → GPU spins up → trains → shuts down → logs to MLflow / Vertex</div></div>
+  </div>
+
+  <div class="section-heading">Monitoring</div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">Prometheus + Grafana · docker-compose</div><div class="cell-desc">Scrapes localhost:8000/metrics</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">Google Managed Prometheus + Grafana</div><div class="cell-desc">GMP scrapes your /metrics automatically inside GKE — zero infra to run</div></div>
+  </div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">No alerting</div><div class="cell-desc">You notice failures manually</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Cloud Monitoring Alerting Policies</div><div class="cell-desc">Alert on p99 latency &gt; 15s, error rate &gt; 5%, GPU VRAM &gt; 90%</div></div>
+  </div>
+
+  <div class="section-heading">Dataset</div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">HuggingFace download at train time</div><div class="cell-desc">Re-downloads 44k images every run</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">GCS mirror of fashion dataset</div><div class="cell-desc">One-time upload; Vertex Training mounts gs://bucket/dataset/ — 10× faster</div></div>
+  </div>
+
+  <div class="tip"><strong>Vertex AI Training Jobs</strong> are the biggest MLOps upgrade you can make. You go from <code>python train_lora.py</code> in a terminal to a reproducible, auditable, cost-tracked job with its own GPU that auto-terminates when done. Your MLflow run is still logged — nothing changes there.</div>
+</div>
+
+<!-- PHASE 4: CI/CD -->
+<div class="phase" id="p4">
+  <div class="section-heading">Build pipeline</div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">docker build · manual</div><div class="cell-desc">On your campus machine</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">Cloud Build triggered by GitHub push</div><div class="cell-desc">On push to main → build image → push to Artifact Registry → deploy to GKE</div></div>
+  </div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">No tests in pipeline</div><div class="cell-desc">Manual smoke test before demo</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">Cloud Build step: pytest + /health check</div><div class="cell-desc">Build fails if API health check doesn't return 200 — no broken deploys</div></div>
+  </div>
+
+  <div class="section-heading">Deployment strategy</div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">stop_all + start_all</div><div class="cell-desc">Downtime on every update</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">GKE Rolling Update</div><div class="cell-desc">New pod starts → health check passes → old pod terminates — zero downtime</div></div>
+  </div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">One environment (local)</div><div class="cell-desc">No staging/prod split</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">staging namespace + prod namespace in GKE</div><div class="cell-desc">Promote image SHA from staging → prod via Cloud Build approval step</div></div>
+  </div>
+
+  <div class="section-heading">cloudbuild.yaml (the key file)</div>
+  <div class="tip">
+    <strong>Pipeline in 4 steps:</strong> (1) <code>docker build -t REGION-docker.pkg.dev/PROJECT/genai/backend:$COMMIT_SHA .</code> — (2) <code>docker push</code> to Artifact Registry — (3) <code>pytest src/tests/</code> + <code>curl /health</code> — (4) <code>kubectl set image deployment/backend backend=IMAGE:SHA</code> — done. The whole pipeline runs in ~4 minutes on a Cloud Build n1-standard-4.
+  </div>
+</div>
+
+<!-- PHASE 5: Hardening -->
+<div class="phase" id="p5">
+  <div class="section-heading">Secrets</div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">.env file · xargs export</div><div class="cell-desc">Committed to repo risk</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Secret Manager</div><div class="cell-desc">HF_TOKEN, DB_URL mounted as env vars into GKE pods via Workload Identity</div></div>
+  </div>
+
+  <div class="section-heading">Identity &amp; access</div>
+  <div class="row effort-high">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">No IAM — root on machine</div><div class="cell-desc">Any process can read any file</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · high effort</div><div class="cell-title">Workload Identity + least-privilege SA</div><div class="cell-desc">backend-sa: Storage Object Viewer, SQL Client only — nothing else</div></div>
+  </div>
+
+  <div class="section-heading">Cost controls</div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">GPU always on</div><div class="cell-desc">Costs electricity, blocks other users</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">GKE node auto-provisioner + budget alert</div><div class="cell-desc">Scale GPU nodes to 0 when idle; alert at $50/month threshold</div></div>
+  </div>
+  <div class="row effort-med">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">SD model loads on every restart</div><div class="cell-desc">5 GB download, 2+ min cold start</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · medium effort</div><div class="cell-title">Persistent disk pre-baked with model weights</div><div class="cell-desc">Snapshot disk with SD weights pre-downloaded — cold start drops to ~20s</div></div>
+  </div>
+
+  <div class="section-heading">Reproducibility</div>
+  <div class="row effort-low">
+    <div class="cell from"><div class="cell-label">local</div><div class="cell-title">docker-compose.yml</div><div class="cell-desc">Works on one machine</div></div>
+    <div class="arrow-col">→</div>
+    <div class="cell to"><div class="cell-label">GCP · low effort</div><div class="cell-title">Terraform or Pulumi IaC</div><div class="cell-desc">Entire GCP stack in code — spin up or tear down in one command, any account</div></div>
+  </div>
+
+  <div class="tip"><strong>The sentence that impresses instructors:</strong> "Every secret is in Secret Manager, every resource is defined in Terraform, and no human has ever SSH'd into a production pod — all changes go through Cloud Build." That is the definition of production-grade MLOps.</div>
+</div>
+
+<script>
+function showPhase(id, btn) {
+  document.querySelectorAll('.phase').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  btn.classList.add('active');
+}
+</script>

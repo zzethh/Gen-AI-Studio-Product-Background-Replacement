@@ -1,0 +1,61 @@
+version: "3.8"
+
+services:
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:latest
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./mlruns:/mlflow/mlruns
+      - ./mlflow.db:/mlflow/mlflow.db
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/mlruns
+
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - MODEL_ID=runwayml/stable-diffusion-inpainting
+      - LORA_DIR=models/fashion-lora
+      - HF_TOKEN=${HF_TOKEN}
+    volumes:
+      - ./models:/app/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    depends_on:
+      - mlflow
+    command: ["python3", "-m", "uvicorn", "src.local.main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  frontend:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - BACKEND_URL=http://backend:8000
+    depends_on:
+      - backend
+    command: ["python3", "-m", "streamlit", "run", "src/local/app.py", "--server.port=8501", "--server.address=0.0.0.0"]
+
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
