@@ -278,11 +278,21 @@ async def generate(
         # Crop back to original aspect ratio
         output_image = resize_to_original(output_image, original_size)
         
-        # Log to CSV
+        # Log to CSV and JSONL Evaluation records
         try:
             with open("logs/inference_log.csv", 'a', newline='') as f:
                 writer = csv.writer(f)
                 writer.writerow([int(time.time()), prompt, model_mode, num_inference_steps, round(inference_latency, 2), round(clip_score, 2)])
+                
+            os.makedirs("eval", exist_ok=True)
+            import json
+            with open("eval/eval_results.jsonl", "a") as f:
+                f.write(json.dumps({
+                    "model_mode": model_mode,
+                    "clip_score": round(clip_score, 3),
+                    "prompt": prompt,
+                    "latency_s": round(inference_latency, 2)
+                }) + "\n")
         except Exception as e:
             print(f"Logging error: {e}")
 

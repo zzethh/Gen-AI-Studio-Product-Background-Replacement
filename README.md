@@ -1,6 +1,27 @@
 # Gen-AI Studio — Product Background Replacement
 
+| Model Mode       | CLIP Score | Latency (Inference) | System Status |
+|------------------|------------|---------------------|---------------|
+| **Baseline**     | ~28.4      | 4.1s                | Active        |
+| **Light LoRA**   | ~27.1      | 4.4s                | Active        |
+| **Overfit LoRA** | ~14.2      | 4.4s                | Failing (Gate)|
+
 AI-powered product background replacement using Stable Diffusion Inpainting + LoRA fine-tuning, with a full MLOps pipeline. The project demonstrates end-to-end ML deployment — from data preparation and model fine-tuning to experiment tracking, containerization, and a live interactive UI — while showcasing a real-world failure mode (Catastrophic Forgetting) and its mitigation.
+
+## Evaluating Results Live
+
+The system streams formal generative metrics (`CLIP Score`, `Latency`) for every completed inference natively. 
+
+**If you are looking at the code locally:**
+Just open `eval/eval_results.jsonl` in your standard text editor or IDE (VS Code, PyCharm, etc.) to view the metric records.
+
+**If you want to observe it live on the Google Cloud VM (Demonstration Mode):**
+Since the backend is running live on our server (`34.45.215.233`), you can actually watch the metric evaluations stream into the file in real-time while you actuate the Streamlit UI.
+
+If you SSH into the VM, type this command:
+```bash
+tail -f eval/eval_results.jsonl
+```
 
 ## Architecture
 
