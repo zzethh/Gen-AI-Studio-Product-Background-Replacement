@@ -16,7 +16,7 @@ The system streams formal generative metrics (`CLIP Score`, `Latency`) for every
 Just open `eval/eval_results.jsonl` in your standard text editor or IDE (VS Code, PyCharm, etc.) to view the metric records.
 
 **If you want to observe it live on the Google Cloud VM (Demonstration Mode):**
-Since the backend is running live on our server (`34.45.215.233`), you can actually watch the metric evaluations stream into the file in real-time while you actuate the Streamlit UI.
+Since the backend is running live on our server (`genai-studio.duckdns.org`), you can watch the metric evaluations stream into the file in real-time while you use the Streamlit UI.
 
 If you SSH into the VM, type this command:
 ```bash
@@ -38,11 +38,6 @@ tail -f eval/eval_results.jsonl
 │  Before/After   │     │  4. Return composite image           │
 └─────────────────┘     │  5. Expose Telemetry Metrics         │
                         └──────────────────────────────────────┘
-
-### The Dual-Path MLOps Evolution
-As a final phase, this repository was restructured to demonstrate the difference between **Local IaaS Deployments** and **Google Cloud Native (PaaS/SaaS) Enterprise Deployments**:
-* **`deployments/local/`**: Runs locally using standalone Docker containers for `MLflow` (Tracking) and `Prometheus` (Monitoring).
-* **`deployments/gcp/`**: Demonstrates the Enterprise PaaS evolution, actively decoupling the monolith by utilizing `Vertex AI Experiments` for model tracking and `Google Cloud Monitoring` for system telemetry natively without managing containers.
 ```
 
 ---
@@ -163,16 +158,31 @@ PYTHONPATH=. pytest tests/ -v
 
 ---
 
-## Live Google Cloud GPU Access
+## Live Deployment
 
-This project is currently deployed on a **Google Cloud n1-standard-4 Spot VM** with an attached **NVIDIA Tesla T4 GPU**.
+This project is deployed on a **Google Cloud n1-standard-4 Spot VM** with an **NVIDIA Tesla T4 GPU**, mapped to a custom domain via **DuckDNS**.
 
-| Service | Access URL | Description |
+### DNS + Reverse Proxy Architecture
+
+The VM's public IP (`34.45.215.233`) is mapped to `genai-studio.duckdns.org` using DuckDNS dynamic DNS. An **Nginx reverse proxy** runs on port 80 and silently routes traffic to the correct internal service based on the URL path — no raw port numbers are ever exposed to the end user.
+
+```
+genai-studio.duckdns.org/          →  Streamlit UI     (internal :8501)
+genai-studio.duckdns.org/api/      →  FastAPI Backend   (internal :8000)
+genai-studio.duckdns.org/mlflow/   →  MLflow Tracking   (internal :5000)
+genai-studio.duckdns.org/grafana/  →  Grafana Dashboard (internal :3000)
+```
+
+### Live Access URLs
+
+| Service | URL | Status |
 |---|---|---|
-| **Streamlit UI** | [http://34.45.215.233:8501](http://34.45.215.233:8501) | Interactive frontend Gen-AI UI |
-| **FastAPI Backend** | [http://34.45.215.233:8000/docs](http://34.45.215.233:8000/docs) | Raw Swagger inference API |
-| **MLflow Tracking** | [http://34.45.215.233:5000](http://34.45.215.233:5000) | Live SQLite-backed experiment tracking (DNS Rebinding Check Disabled) |
-| **Grafana Dashboard** | [http://34.45.215.233:3000](http://34.45.215.233:3000) | Prometheus live hardware telemetry (Login: admin / admin) |
+| **Streamlit UI** | [http://genai-studio.duckdns.org/](http://genai-studio.duckdns.org/) | ✅ Live |
+| **FastAPI Docs** | [http://genai-studio.duckdns.org/api/docs](http://genai-studio.duckdns.org/api/docs) | ✅ Live |
+| **API Health** | [http://genai-studio.duckdns.org/api/health](http://genai-studio.duckdns.org/api/health) | ✅ Live |
+| **MLflow Tracking** | [http://genai-studio.duckdns.org/mlflow/](http://genai-studio.duckdns.org/mlflow/) | ✅ Live |
+| **Grafana** | [http://genai-studio.duckdns.org/grafana/](http://genai-studio.duckdns.org/grafana/) | ✅ Live |
+| **Prometheus** | [http://genai-studio.duckdns.org/prometheus/](http://genai-studio.duckdns.org/prometheus/) | ✅ Live |
 
 *If local scripts are required, refer to `start_gcp.sh`!*
 
@@ -195,21 +205,13 @@ stop_all
 ```
 dlops_project/
 ├── deployments/
-│   ├── gcp/                   # Native GCP Cloud (Vertex/Storage) deployment configs
-│   │   ├── cloudbuild.yaml
-│   │   └── gcp-architecture.txt
-│   └── local/                 # IaaS Local Dockerized deployment configs
+│   └── local/                 # Dockerized deployment configs
 │       ├── docker-compose.yml 
 │       └── prometheus.yml
 ├── src/
 │   ├── local/                 
-│   │   ├── main.py            # Local FastAPI Backend (Prometheus, CSV)
-│   │   └── app.py             # Local Streamlit UI (SQLite Fetching)
-│   ├── enterprise/
-│   │   ├── main_gcp.py        # Cloud FastAPI Backend (GCS, Managed Monitoring)
-│   │   ├── app_gcp.py         # Cloud Streamlit UI (Vertex Fetching)
-│   │   ├── tracking_gcp.py    # Vertex AI telemetry & alerting abstractions
-│   │   └── storage_gcp.py     # Cloud Storage (GCS) weight loading mechanisms
+│   │   ├── main.py            # FastAPI Backend (Prometheus, CSV)
+│   │   └── app.py             # Streamlit UI (SQLite Fetching)
 │   ├── prepare_dataset.py
 │   └── train_lora.py
 ├── models/                    # Fine-tuned adapter weights
@@ -314,7 +316,7 @@ Every time `train_lora.py` runs, it:
 
 ### What Will the MLflow Dashboard Show?
 
-When you open **http://localhost:5000** in a browser:
+When you open **http://genai-studio.duckdns.org/mlflow/** in a browser:
 
 - **Experiments Tab**: Lists the `LoRA-Fashion-Inpainting` experiment with all training runs (both the full 44K-step overfit run and the 350-step light run).
 - **Run Comparison View**: Click any run to see:
@@ -323,7 +325,7 @@ When you open **http://localhost:5000** in a browser:
   - **Artifacts Panel**: The saved LoRA weight files (`adapter_config.json`, `adapter_model.safetensors`).
 - **Compare Runs**: Select multiple runs and click "Compare" to see hyperparameters and loss curves side-by-side — illustrating why the overfit model failed and the light model succeeded.
 
-MLflow is accessible at `http://localhost:5000`, or via SSH tunnel for remote access.
+MLflow is accessible at `http://genai-studio.duckdns.org/mlflow/`.
 
 ---
 
@@ -385,7 +387,7 @@ User's Device                 Ngrok Tunnel              Streamlit (8501)
    - The correct LoRA adapter is hot-swapped (or disabled for Baseline).
    - Stable Diffusion runs inpainting with the given parameters.
    - Output image is returned and displayed side-by-side with the original.
-7. MLflow tracks all experiment metadata and is accessible at `http://localhost:5000`.
+7. MLflow tracks all experiment metadata and is accessible at `http://genai-studio.duckdns.org/mlflow/`.
 
 ### Phase 3: After the Demo (Model Registry & Reproducibility)
 
