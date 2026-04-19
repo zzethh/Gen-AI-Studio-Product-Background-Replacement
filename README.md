@@ -1,5 +1,7 @@
 # Gen-AI Studio — Product Background Replacement
 
+![Streamlit Interface](pics/pic1.png)
+
 | Model Mode       | CLIP Score | Latency (Inference) | System Status |
 |------------------|------------|---------------------|---------------|
 | **Baseline**     | ~28.4      | 4.1s                | Active        |
@@ -135,8 +137,8 @@ start_all
 ### Start Services
 ```bash
 source commands.sh
-start_all        # Starts MLflow + FastAPI + Streamlit
-start_ngrok      # Creates public tunnel URL
+start_all
+start_ngrok
 ```
 
 ### Testing & Validation
@@ -175,22 +177,25 @@ genai-studio.duckdns.org/grafana/  →  Grafana Dashboard (internal :3000)
 
 ### Live Access URLs
 
-| Service | URL | Status |
+| Service | Primary URL (DuckDNS) | Fallback URL (Bypasses Firewalls) |
 |---|---|---|
-| **Streamlit UI** | [http://genai-studio.duckdns.org/](http://genai-studio.duckdns.org/) | ✅ Live |
-| **FastAPI Docs** | [http://genai-studio.duckdns.org/api/docs](http://genai-studio.duckdns.org/api/docs) | ✅ Live |
-| **API Health** | [http://genai-studio.duckdns.org/api/health](http://genai-studio.duckdns.org/api/health) | ✅ Live |
-| **MLflow Tracking** | [http://genai-studio.duckdns.org/mlflow/](http://genai-studio.duckdns.org/mlflow/) | ✅ Live |
-| **Grafana** | [http://genai-studio.duckdns.org/grafana/](http://genai-studio.duckdns.org/grafana/) | ✅ Live |
-| **Prometheus** | [http://genai-studio.duckdns.org/prometheus/](http://genai-studio.duckdns.org/prometheus/) | ✅ Live |
+| **Streamlit UI** | [http://genai-studio.duckdns.org/](http://genai-studio.duckdns.org/) | [http://34.45.215.233/](http://34.45.215.233/) |
+| **FastAPI Docs** | [http://genai-studio.duckdns.org/api/docs](http://genai-studio.duckdns.org/api/docs) | [http://34.45.215.233/api/docs](http://34.45.215.233/api/docs) |
+| **API Health** | [http://genai-studio.duckdns.org/api/health](http://genai-studio.duckdns.org/api/health) | [http://34.45.215.233/api/health](http://34.45.215.233/api/health) |
+| **MLflow** | [http://genai-studio.duckdns.org/mlflow/](http://genai-studio.duckdns.org/mlflow/) | [http://34.45.215.233/mlflow/](http://34.45.215.233/mlflow/) |
+| **Grafana** | [http://genai-studio.duckdns.org/grafana/](http://genai-studio.duckdns.org/grafana/) | [http://34.45.215.233/grafana/](http://34.45.215.233/grafana/) |
+| **Prometheus** | [http://genai-studio.duckdns.org/prometheus/](http://genai-studio.duckdns.org/prometheus/) | [http://34.45.215.233/prometheus/](http://34.45.215.233/prometheus/) |
+
+> [!NOTE]
+> If your enterprise/university network blocks `.duckdns.org` queries via Deep Packet Inspection, use the Fallback IP URLs to bypass the DNS restriction.
 
 *If local scripts are required, refer to `start_gcp.sh`!*
 
 ### Train LoRA Models
 ```bash
 source commands.sh
-train_light      # 350-step balanced fine-tune → models/fashion-lora-light
-train_full       # Full 1-epoch fine-tune → models/fashion-lora (overfit demo)
+train_light
+train_full
 ```
 
 ### Stop Services
@@ -204,28 +209,59 @@ stop_all
 ## Project Structure
 ```
 dlops_project/
-├── deployments/
-│   └── local/                 # Dockerized deployment configs
-│       ├── docker-compose.yml 
-│       └── prometheus.yml
 ├── src/
-│   ├── local/                 
-│   │   ├── main.py            # FastAPI Backend (Prometheus, CSV)
-│   │   └── app.py             # Streamlit UI (SQLite Fetching)
+│   ├── main.py
+│   ├── app.py
 │   ├── prepare_dataset.py
 │   └── train_lora.py
-├── models/                    # Fine-tuned adapter weights
-├── start_gcp.sh               # Active Remote Run configuration
+├── models/
+│   ├── fashion-lora/
+│   └── fashion-lora-light/
+├── eval/
+│   └── eval_results.jsonl
+├── grafana/
+│   ├── dashboards/
+│   └── provisioning/
+├── tests/
+│   └── test_api.py
+├── scripts/ops/
+│   └── register_adapter.py
+├── docker-compose.yml
+├── prometheus.yml
+├── Dockerfile
+├── requirements.txt
+├── commands.sh
+└── start_gcp.sh
 ```
 
 ---
 
 ## API Endpoints
 
+![FastAPI Interactive Docs](pics/pic2.png)
+
+All endpoints are served under the `/api` prefix via the Nginx reverse proxy.
+Full interactive documentation: [http://34.45.215.233/api/docs](http://34.45.215.233/api/docs)
+
 ### `GET /health`
-Returns model load status.
+
+![API Health Check](pics/pic3.png)
+
+Endpoint to check if the FastAPI backend and Stable Diffusion model are loaded and active.
+
+### `GET /metrics`
+Exposes Prometheus-compatible telemetry metrics (OpenMetrics format). This endpoint is automatically scraped by Prometheus every 5 seconds and powers the Grafana dashboard.
+
+### `POST /extract_mask`
+Extracts the product foreground mask using `rembg` (U2Net). Returns a binary mask image (PNG) showing the detected product region. Useful for debugging mask quality before running full inference.
+
+| Parameter | Type | Description |
+|---|---|---|
+| `image` | File | Product image (PNG/JPG/JPEG/WebP) |
 
 ### `POST /generate`
+Runs the full inference pipeline: mask extraction → background inpainting → CLIP scoring → metric logging.
+
 | Parameter | Type | Default | Description |
 |---|---|---|---|
 | `image` | File | required | Product image (PNG/JPG/JPEG/WebP) |
@@ -236,7 +272,55 @@ Returns model load status.
 | `model_mode` | string | "baseline" | `baseline`, `light`, or `overfit` |
 
 ### `POST /upload`
-Push trained LoRA weights to Hugging Face Hub.
+Push trained LoRA weights to Hugging Face Hub for versioned model registry.
+
+---
+
+## Prometheus Observability
+
+This project exposes complete internal telemetry. The Prometheus TSDB is tracking metrics natively on the backend, and Grafana is visualising them.
+
+![Prometheus TSDB](pics/pic5.png)
+
+![Grafana Dashboard](pics/pic6.png)
+
+Below is the dictionary of **Prometheus PromQL queries** that have been natively instrumented: Prometheus query UI at [http://34.45.215.233/prometheus/query](http://34.45.215.233/prometheus/query) for live observability:
+
+| Query | Description |
+|---|---|
+| `genai_images_generated_total` | Total images generated, broken down by model mode (baseline/light/overfit) |
+| `genai_inference_latency_seconds_sum / genai_inference_latency_seconds_count` | Average inference latency across all requests |
+| `rate(genai_inference_latency_seconds_count[5m])` | Inference throughput (requests per second over 5-minute window) |
+| `genai_clip_score_sum / genai_clip_score_count` | Average CLIP score across all generations |
+| `genai_gpu_vram_bytes` | Current GPU VRAM usage in bytes |
+| `rate(http_requests_total[5m])` | Total HTTP request rate across all API endpoints |
+| `http_request_duration_seconds_sum / http_request_duration_seconds_count` | Average HTTP request duration |
+| `up` | Scrape target health (1 = up, 0 = down) |
+
+Grafana connects to Prometheus as a data source and visualizes these metrics in the pre-provisioned **Gen-AI Studio — MLOps Dashboard** at [http://34.45.215.233/grafana/](http://34.45.215.233/grafana/) (login: `admin` / `admin`).
+
+---
+
+## Evaluation Logging (`eval/eval_results.jsonl`)
+
+Every inference request automatically appends a structured evaluation record to `eval/eval_results.jsonl`. This file provides a persistent, append-only audit trail of all generation quality metrics.
+
+Each line is a JSON object:
+```json
+{"model_mode": "baseline", "clip_score": 25.634, "prompt": "A professional photo sitting on a mossy rock...", "latency_s": 23.25}
+```
+
+| Field | Description |
+|---|---|
+| `model_mode` | Which model variant was used (`baseline`, `light`, or `overfit`) |
+| `clip_score` | Semantic alignment score between the generated image and the text prompt (CLIP ViT-B/32) |
+| `prompt` | The exact text prompt used for background generation |
+| `latency_s` | End-to-end inference latency in seconds |
+
+To monitor this file in real-time on the VM:
+```bash
+tail -f eval/eval_results.jsonl
+```
 
 ---
 
@@ -295,7 +379,7 @@ A REST API server running on port 8000. On startup it:
 - Loads both LoRA adapters (`overfit` and `light`) into the UNet using PEFT's multi-adapter system.
 - Exposes `/generate` (inference), `/health` (status), and `/upload` (push to HuggingFace) endpoints.
 
-### 5. Streamlit Frontend (`src/local/app.py`)
+### 5. Streamlit Frontend (`src/app.py`)
 A highly optimized dark-mode Streamlit dashboard running natively on port 8501. It handles dynamic image uploads, form state management across inference runs, and visually structures the resulting generation data using Streamlit metrics and columns.
 
 ### 6. Containerization Elements
@@ -308,6 +392,9 @@ Since the underlying GPU server is hosted on a secure private university network
 ## MLflow: Experiment Tracking in Detail
 
 ### What Is MLflow Doing in This Project?
+
+![MLflow Training Runs](pics/pic4.png)
+
 Every time `train_lora.py` runs, it:
 1. **Creates a new MLflow Run** under the experiment `LoRA-Fashion-Inpainting`.
 2. **Logs all hyperparameters** as key-value pairs: `learning_rate`, `lora_rank`, `batch_size`, `max_steps`, `resolution`, `model_id`, `dataset_name`, etc.

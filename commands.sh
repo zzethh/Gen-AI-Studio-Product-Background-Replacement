@@ -16,7 +16,7 @@ start_all() {
     nohup python -m uvicorn src.main:app --host 0.0.0.0 --port 8000 > logs/backend.log 2>&1 &
     
     echo "Starting Streamlit Frontend..."
-    nohup streamlit run src/app.py --server.port 8501 --server.address 0.0.0.0 > logs/streamlit.log 2>&1 &
+    nohup streamlit run src/app.py --server.port 8501 --server.address 0.0.0.0 --server.enableCORS false --server.enableXsrfProtection false > logs/streamlit.log 2>&1 &
     
     echo "All services started!"
 }

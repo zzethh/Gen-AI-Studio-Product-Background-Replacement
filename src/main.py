@@ -16,7 +16,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 from prometheus_client import Counter, Histogram, Gauge
 import threading
 
-app = FastAPI(title="DLOps Gen-AI Studio — Background Replacement API", root_path="/api")
+app = FastAPI(title="DLOps Gen-AI Studio — Background Replacement API")
 
 # --- Define custom metrics ---
 IMAGES_GENERATED = Counter(
